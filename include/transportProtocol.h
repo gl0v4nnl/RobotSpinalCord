@@ -6,27 +6,42 @@
 /**
  * The table of commands
  * 
- * +----+------+----------+
- * |TYPE|ENTITY|SUBCOMMAND|
- * +----+------+----------+
+ * +---------+---------+---------+---------+---------+---------+---------+
+ * |  BYTE6  |  BYTE5  |  BYTE4  |  BYTE3  |  BYTE2  |  BYTE1  |  BYTE0  |
+ * +---------+---------+---------+---------+---------+---------+---------+
+ * | COMMAND | ENTITY  |GEN.PARAM|AUX.PARAM|  DATA2  |  DATA1  |  DATA0  |
+ * +---------+---------+---------+---------+---------+---------+---------+
+ * |               CHARFIELD               |          INTFIELD           |
+ * +---------------------------------------+-----------------------------+
  * 
  * +----+----------------------------------------------------+
- * |TYPES :                                                  |
+ * |--- COMMANDS ---                                         |
  * |S - SET  - set some entity to needed state               |
  * |G - GET  - get state of needed entity, this is a request |                              
  * |I - INFO - command, addressed from Mega to RPI           |
  * +---------------------------------------------------------+
- * |ENTITIES :                                               |
- * |N - NONE  - no entity, global command                    |
+ * |--- ENTITIES ---                                         |
+ * |T - TRANSMISSION - global command                        |
  * |W - WHEEL - addressed to wheel (left or right)           |
  * +---------------------------------------------------------+
- * |SUBCOMMANDS : depend on TYPE and ENTITY                  |
+ * |--- GENERAL PARAMETERS ---                               |
+ * |R - RIGHT                                                |
+ * |L - LEFT                                                 |
+ * +---------------------------------------------------------+
+ * |--- AUXILARY PARAMETERS ---                              |
+ * |U - UP                                                   |
+ * |D - DOWN                                                 |
+ * +---------------------------------------------------------+
+ * |--- DATA ---                                             |
+ * |Numeric data from 0 to 999                               |
  * +---------------------------------------------------------+
  * 
  */
 
-#define COUNT_OF_CHAR_PARAMS 3
-#define MAX_LENGTH 7
+#define COMMAND_WHOLE_LENGTH 7
+#define COMMAND_DATA_LENGTH 3
+#define COMMAND_NAME_LENGTH (COMMAND_WHOLE_LENGTH - COMMAND_DATA_LENGTH)
+#define COMMAND_COUNT 20
 
 typedef enum {
     PARSE_OK = 0,
@@ -35,52 +50,44 @@ typedef enum {
     PARSE_TOO_LONG,
     PARSE_WRONG_TYPE,
     PARSE_WRONG_ENTITY,
-    PARSE_WRONG_SIDE,
-    PARSE_WRONG_WHLDRCT,
+    PARSE_WRONG_GENPARAM,
+    PARSE_WRONG_AUXPARAM,
+    PARSE_WRONG_CHAR_PARAM,
     PARSE_WRONG_UINT_PARAM
 } e_parse_state;
 
-typedef enum {
-    CMD_TYPE_UNKNOWN = -1,
-    CMD_TYPE_GET,
-    CMD_TYPE_SET,
-    CMD_TYPE_INFO
-} e_cmd_type;
 
-/*
-typedef enum {
-    CMD_ENT_UNKNOWN = -1,
-    CMD_ENT_NONE, // addressed to all system, contains 2 bytes (for example SNA - none|active)
-    CMD_ENT_WHEEL // addressed to a wheel, contains 6 bytes (for example SWLU001 - wheel|left|up|001)
-} e_cmd_ent;
+class XferCommand {
 
-typedef enum {
-    CMD_SIDE_UNKNOWN = -1,
-    CMD_SIDE_RIGHT,
-    CMD_SIDE_LEFT
-} e_cmd_side;
+    typedef struct {
+        char commandName[COMMAND_NAME_LENGTH];
+        void (* function)(uint16_t);
+    } t_commandCallback;
 
-typedef enum {
-    CMD_WHLDRCT_UNKNOWN = -1,
-    CMD_WHLDRCT_UP,
-    CMD_WHLDRCT_DOWN,
-} e_cmd_whldrct;
-*/
+    t_commandCallback * commandList;
+    uint8_t commandCount;    
 
-class xferInterf {
-    const int maxLength = MAX_LENGTH;
-    String message;
     e_parse_state parseState;
-    e_cmd_type cmdType;
-    char charParam[3];
-    uint16_t uintParam;
-public:
-    xferInterf();
+    uint16_t data;
 
-    e_parse_state ParseCommand(String usrString);
-    e_parse_state ParseCommand(char * usrBytes, uint8_t length = MAX_LENGTH);
-    e_parse_state GetLastParseState(void) const;
-    e_cmd_type GetType(void) const;
-    char GetCharParamByIndex(uint8_t usrIndex) const;
-    uint8_t GetUintParam(void) const;
+    // Pointer to the default handler function
+    void (*defaultHandler)(const char *);
+
+    char delim[2]; // null-terminated list of character to be used as delimeters for tokenizing (default " ")
+    char term;     // Character that signals end of command (default '\n')
+
+    char buffer[COMMAND_WHOLE_LENGTH]; // Buffer of stored characters while waiting for terminator character
+    uint8_t bufPos;                        // Current position in the buffer
+    char *last;                         // State variable used by strtok_r during processing
+    
+public:
+    XferCommand();
+
+    void AddCommand(char * cmdName, void (* function)(uint16_t));
+    void SetDefaultHandler(void (*function)(const char *));   // A handler to call when no valid command received.
+    void ClearBuffer();   // Clears the input buffer.
+    char *Next(void);
+
+    e_parse_state  ParseCommand(char * usrBytes, uint8_t length = COMMAND_WHOLE_LENGTH);
+    e_parse_state  GetLastParseState(void) const;
 };

@@ -17,7 +17,7 @@
 SoftwareSerial xferSerial = SoftwareSerial(0, 1, false);
 #endif
 
-xferInterf xferInterface = xferInterf();
+XferCommand xchgCommand = XferCommand();
 
 void setup() {
   xferSerial.begin(115200);
@@ -40,9 +40,7 @@ static t_tog toggle = {0, 0};
 static e_state globalState = STATE_STDBY;
 static String cmdString = String("");
 static e_parse_state parseState = PARSE_UNKNOWN;
-//static e_cmd_type commandType = CMD_TYPE_UNKNOWN;
-
-void ImplementCommand(xferInterf usrXferInterface);
+//static e_cmd commandType = CMD_UNKNOWN;
 
 void loop() {
 #ifndef USB_SERIAL
@@ -55,7 +53,7 @@ void loop() {
     size_t receivedBytes = xferSerial.readBytes((uint8_t *)tmpCmdBytes, 7);
 
     if (0 != receivedBytes) {
-      parseState = xferInterface.ParseCommand(tmpCmdBytes);
+      parseState = xchgCommand.ParseCommand(tmpCmdBytes);
     }
 #ifdef DEBUG
     if (PARSE_OK != parseState)
@@ -75,14 +73,6 @@ void loop() {
       pinMode(LED_PIN, LOW);
 
         if (PARSE_OK == parseState) {
-
-          ImplementCommand(xferInterface);
-
-          if (('G' == xferInterface.GetCharParamByIndex(0)) && 
-              ('S' == xferInterface.GetCharParamByIndex(1))) {
-            toggle.pauseCnt = 0;
-            globalState = STATE_STDBY;
-          }
           
           parseState = PARSE_UNKNOWN;
         }
@@ -101,20 +91,6 @@ void loop() {
         }
 
         if (PARSE_OK == parseState) {
-          char tmpCharParam[3] = {
-            xferInterface.GetCharParamByIndex(0),
-            xferInterface.GetCharParamByIndex(1),
-            xferInterface.GetCharParamByIndex(2)
-          };
-
-          xferSerial.write((uint8_t *)tmpCharParam, 3);
-          xferSerial.write((int)xferInterface.GetUintParam());
-
-          if (('G' == xferInterface.GetCharParamByIndex(0)) && 
-              ('A' == xferInterface.GetCharParamByIndex(1))) {
-            globalState = STATE_ACTIVE;
-          }
-
           parseState = PARSE_UNKNOWN;
         }    
     break;
@@ -125,21 +101,4 @@ void loop() {
   };
 
   delay(TIMEOUT);
-}
-
-void ImplementCommand(xferInterf usrXferInterface) {
-  e_cmd_type usrCmdType = usrXferInterface.GetType();
-
-  if (CMD_TYPE_GET == usrCmdType) {
-
-  }
-  else if (CMD_TYPE_SET == usrCmdType) {
-
-  }
-  else if (CMD_TYPE_SET == usrCmdType) {
-
-  }
-  else {
-
-  }
 }
